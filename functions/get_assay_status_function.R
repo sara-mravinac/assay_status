@@ -46,27 +46,33 @@ get_assay_status <- function(uniprot_list,
     
   } else{
     
-    status_level_1 <-
+    status_level_adjust <-
       uniprot_list %>%
       left_join(d72) %>%
-      select(uniprot, assay_status, vendor_a, art_no_ag, artnr_a_arm, art_nr_b_arm, vendor_b, issue,  antigen, vendor_ag, comment_status) %>%
       mutate(assay_status = if_else(is.na(assay_status), "not screened", assay_status)) %>%
       mutate(assay_status = str_to_lower(assay_status)) %>%
       left_join(assay_categories) %>%
       mutate(assay_status_category = if_else(assay_status == "not screened", "Not screened", assay_status_category),
              antigen_check_needed = if_else(assay_status == "not screened", "yes", antigen_check_needed)) %>%
-      # filter(!(assay_status_category == "Duplicate")) %>% # the uniprot should already exist in the list
-      arrange(desc(order_in_pipeline)) %>%
-      group_by(uniprot) %>%
+      mutate(assay_order_in_pipeline_same_ab = case_when(assay_status_category == "Terminated" ~ 15,
+                                                         .default = assay_order_in_pipeline)) %>%
+      arrange(desc(assay_order_in_pipeline_same_ab)) %>%
+      group_by(uniprot, vendor_a) %>%
       slice_head(n = 1) %>%
       ungroup() %>%
-      mutate(assay_status = case_when((!is.na(synonym_to)) ~ synonym_to,
+      arrange(desc(assay_order_in_pipeline)) %>%
+      mutate(assay_status = case_when((!is.na(assay_synonym_to)) ~ assay_synonym_to,
                                       .default = assay_status)) %>%
-      select(-synonym_to, -comment, -order_in_pipeline) %>%
       left_join(in_product) %>%
       mutate(assay_status_category = case_when(!(is.na(in_product)) ~ in_product,
                                                .default = assay_status_category)) %>%
-      select(-in_product)
+      select(-in_product, -assay_synonym_to)
+    
+    status_level_1 <-
+      status_level_adjust %>%
+      group_by(uniprot) %>%
+      slice_head(n = 1) %>%
+      ungroup()
     
     status_screening_clear <-
       status_level_1 %>%
@@ -74,10 +80,11 @@ get_assay_status <- function(uniprot_list,
       select(uniprot, assay_status_category, assay_status, art_no_ag, artnr_a_arm, vendor_a, art_nr_b_arm, vendor_b, antigen, vendor_ag, issue, comment_status)
     
     status_antigen <-
-      status_level_1 %>%
+      status_level_adjust %>%
       filter(!uniprot %in% status_screening_clear$uniprot) %>%
-      left_join(master_list) %>%
-      select(names(status_level_1), absea, icosagen, "bonopus" = bon_opus, art_no_ag) %>%
+      left_join(master_list %>%
+                  select(uniprot, absea, icosagen, "bonopus" = bon_opus), by = "uniprot") %>%
+      select(names(status_level_1), absea, icosagen, bonopus, art_no_ag) %>%
       mutate(across(c(vendor_a, absea, icosagen, bonopus, art_no_ag), ~ str_to_lower(.x))) %>%
       mutate(across(c(vendor_a, absea, icosagen, bonopus), ~ str_replace_all(.x, "0", NA_character_)))
     
@@ -88,7 +95,7 @@ get_assay_status <- function(uniprot_list,
                is.na(icosagen) &
                is.na(bonopus)) %>%
       mutate(antigen_status_category = "Never initiated",
-             antigen_status = "never initiated") %>%
+             antigen_status = "Never initiated") %>%
       select(uniprot, assay_status_category, assay_status, antigen_status_category, art_no_ag, artnr_a_arm, vendor_a, art_nr_b_arm, vendor_b, antigen, vendor_ag, issue, comment_status)
     
     not_screened_ag_initiated <-
@@ -99,13 +106,13 @@ get_assay_status <- function(uniprot_list,
                    values_to = "vendor_categry") %>%
       left_join(antigen_categories, by = c("vendor_categry" = "antigen_status")) %>%
       filter(!is.na(vendor_categry)) %>%
-      arrange(desc(order_in_pipeline)) %>%
+      arrange(desc(antigen_order_in_pipeline)) %>%
       group_by(uniprot) %>%
       slice_head(n = 1) %>%
       ungroup() %>%
       select(names(never_initiated))
     
-    screened_agrisera <-
+    screened_agrisera_prep <-
       status_antigen %>%
       filter(str_detect(vendor_a, "agrisera")) %>% 
       mutate(vendor_a = str_remove(vendor_a, "/abcore")) %>%
@@ -116,14 +123,32 @@ get_assay_status <- function(uniprot_list,
       pivot_longer(cols = c(absea, icosagen, bonopus),
                    names_to = "vendor_antigen",
                    values_to = "vendor_categry") %>%
-      left_join(antigen_categories, by = c("vendor_categry" = "antigen_status")) %>%
+      left_join(antigen_categories, by = c("vendor_categry" = "antigen_status"))
+    
+    screened_agrisera_1 <-
+      screened_agrisera_prep %>%
+      filter(!is.na(vendor_categry)) %>%
       filter(vendor_a != vendor_antigen) %>%
-      arrange(desc(order_in_pipeline)) %>%
-      group_by(uniprot) %>%
+      arrange(desc(antigen_order_in_pipeline)) %>%
+      group_by(uniprot, vendor_a) %>%
       slice_head(n = 1) %>%
-      mutate(antigen_status_category = if_else(is.na(antigen_status_category), "Never re-initiated", antigen_status_category)) %>%
+      ungroup() %>%
       select(names(never_initiated))
     
+    screened_agrisera_2 <-
+      screened_agrisera_prep %>%
+      filter(is.na(vendor_categry)) %>%
+      filter(!uniprot %in% screened_agrisera_1$uniprot) %>%
+      arrange(desc(assay_order_in_pipeline)) %>%
+      group_by(uniprot) %>%
+      slice_head(n = 1) %>%
+      mutate(antigen_status_category = "Never re-initiated") %>%
+      select(names(never_initiated))
+    
+    screened_agrisera <-
+      bind_rows(screened_agrisera_1,
+                screened_agrisera_2)
+      
     screened_other <-
       status_antigen %>%
       filter(!uniprot %in% never_initiated$uniprot &
@@ -133,7 +158,7 @@ get_assay_status <- function(uniprot_list,
                    names_to = "vendor_antigen",
                    values_to = "vendor_categry") %>%
       left_join(antigen_categories, by = c("vendor_categry" = "antigen_status")) %>%
-      arrange(desc(order_in_pipeline)) %>%
+      arrange(desc(antigen_order_in_pipeline)) %>%
       group_by(uniprot) %>%
       slice_head(n = 1) %>%
       ungroup() %>%
@@ -154,9 +179,9 @@ get_assay_status <- function(uniprot_list,
                                                      .default = paste0(assay_status_category, ";", antigen_status_category))) %>%
       relocate(antigen_status_category, .after = assay_status) %>%
       relocate(assay_status_antigen_status, .after = uniprot)
-  
-  write_xlsx(status_final, paste0("output/", Sys.Date(), "_assay_status_per_uniprot.xlsx"))
-  
-  return(status_final)
+    
+    write_xlsx(status_final, paste0("output/", Sys.Date(), "_assay_status_per_uniprot.xlsx"))
+    
+    return(status_final)
   }
 }
