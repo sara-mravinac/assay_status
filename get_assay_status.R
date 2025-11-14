@@ -28,16 +28,9 @@ in_maximus <- read_xlsx("data/Product assay lists_2025-07-21.xlsx", sheet = "Max
 in_product <-
   in_released_product %>%
   bind_rows(in_maximus) %>%
-  mutate(uniprot_olink_product = uniprot) %>% # keep original uniprot ID informing about multitargets and specific variants
-  separate_rows(uniprot, sep = "_") %>% #separate multitarget assays into inidividual IDs
   distinct() %>%
-  filter(str_length(uniprot) >= 4) %>% # remove what is not uniprot ID
-  arrange(str_length(uniprot_olink_product)) %>% # if there is both single and multitarget assay, single will be favored
-  group_by(uniprot) %>%
-  slice_head(n = 1) %>%
-  ungroup() %>%
-  mutate(in_product = if_else(uniprot_olink_product %in% in_released_product$uniprot, "In released product", "In Maximus"))
-  
+  mutate(in_product = if_else(uniprot %in% in_released_product$uniprot, "In released product", "In Maximus"))
+
 
 # d72 <- read_xlsx("data/DOK084-072 Summary of results in PD084.xlsx", sheet = "All assays", skip = 2) %>%
 #   clean_names() %>%
@@ -51,7 +44,8 @@ source("functions/get_assay_status_function.R")
 
 master_list <-
   read_xlsx("data/Data driven Priolist with status update_20250911_AEH.xlsx", sheet = "Analysis") %>%
-  clean_names()
+  clean_names() %>%
+  mutate(across(where(is.character), str_squish))
 
 d72 <- read_xlsx("data/Master_list med 072 status.xlsx", sheet = "Dok_084-72") %>%
   clean_names() %>%
@@ -59,8 +53,7 @@ d72 <- read_xlsx("data/Master_list med 072 status.xlsx", sheet = "Dok_084-72") %
   rename("assay_status" = status) %>% 
   filter(!is.na(uniprot)) %>%
   filter(!is.na(assay_status)) %>%
-  mutate(uniprot = str_replace_all(uniprot, " ", ""))
-
+  mutate(across(where(is.character), str_squish))
 
 assay_status_resut <- get_assay_status(
   uniprot_list,
@@ -70,7 +63,6 @@ assay_status_resut <- get_assay_status(
   d72,
   master_list
 )
-
 
 assay_status_resut %>%
   select(assay_status_antigen_status) %>%
@@ -90,15 +82,15 @@ assay_status_resut_compare <-
               select(uniprot, "Status AEH")) %>%
   relocate(`Status AEH`, .after = uniprot)
 
-write_xlsx(assay_status_resut_compare, "assay_status_resut_compare_2025_11_11.xlsx")
+write_xlsx(assay_status_resut_compare, "assay_status_resut_compare_2025_11_14.xlsx")
 
 status_compare_count <-
-assay_status_resut_compare %>%
+  assay_status_resut_compare %>%
   group_by(assay_status_antigen_status, `Status AEH`) %>%
   count() %>%
   arrange(desc(n))
 
-write_xlsx(status_compare_count, "status_compare_count_2025_11_11.xlsx")
+write_xlsx(status_compare_count, "status_compare_count_2025_11_14.xlsx")
 
 d72_status <- 
   d72 %>%
