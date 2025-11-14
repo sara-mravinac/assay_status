@@ -139,7 +139,7 @@ get_assay_status <- function(uniprot_list,
     # update screened with switched vendor
     screened <-
       screened %>%
-      filter(!uniprot %in% screened_switched_vendor$uniprot) %>%
+      filter(!sorter %in% screened_switched_vendor$sorter) %>%
       bind_rows(screened_switched_vendor)
     
     # identify uniprot where commercial Ab is on higher development level than Agrisera

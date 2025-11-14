@@ -49,7 +49,7 @@ master_list <-
 
 d72 <- read_xlsx("data/Master_list med 072 status.xlsx", sheet = "Dok_084-72") %>%
   clean_names() %>%
-  select(uniprot, status, vendor_a, art_no_ag, artnr_a_arm, art_nr_b_arm, vendor_b, issue, antigen, vendor_ag, comment_status) %>%
+  select(uniprot, status, vendor_a, art_no_ag, artnr_a_arm, art_nr_b_arm, vendor_b, issue, antigen, vendor_ag, comment_status, sorter) %>%
   rename("assay_status" = status) %>% 
   filter(!is.na(uniprot)) %>%
   filter(!is.na(assay_status)) %>%
