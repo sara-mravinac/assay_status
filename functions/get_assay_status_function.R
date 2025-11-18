@@ -80,7 +80,7 @@ get_assay_status <- function(uniprot_list,
       slice_head(n = 1) %>%
       ungroup() %>%
       filter(antigen_check_needed == "no" | assay_status_category %in% c("In Maximus", "In released product")) %>%
-      select(uniprot, assay_status_category, assay_status, art_no_ag, artnr_a_arm, vendor_a, art_nr_b_arm, vendor_b, antigen, vendor_ag, issue, comment_status)
+      select(uniprot, assay_status_category, assay_status, everything())
     
     # For the rest, add antigen data, all different assays for the same uniprot are kept
     status_antigen <-
@@ -101,7 +101,7 @@ get_assay_status <- function(uniprot_list,
                is.na(bonopus)) %>%
       mutate(antigen_status_category = "Never initiated",
              antigen_status = "Never initiated") %>%
-      select(uniprot, assay_status_category, assay_status, antigen_status_category, art_no_ag, artnr_a_arm, vendor_a, art_nr_b_arm, vendor_b, antigen, vendor_ag, issue, comment_status)
+      select(uniprot, assay_status_category, assay_status, antigen_status_category, art_no_ag, artnr_a_arm, vendor_a, art_nr_b_arm, vendor_b, antigen, vendor_ag, issue, comment_status, sorter)
     
     # separate those never screened but with initiated antigen
     not_screened_ag_initiated <-
@@ -241,12 +241,22 @@ get_assay_status <- function(uniprot_list,
       bind_rows(status_screening_clear %>%
                   mutate(antigen_status_category = NA),
                 status_antigen_final) %>%
-      
       mutate(assay_status_category = if_else(assay_status_category == "In product", "Removed from product", assay_status_category)) %>%
       mutate(assay_status_antigen_status = case_when(is.na(antigen_status_category) ~ assay_status_category,
                                                      .default = paste0(assay_status_category, ";", antigen_status_category))) %>%
-      relocate(antigen_status_category, .after = assay_status) %>%
-      relocate(assay_status_antigen_status, .after = uniprot)
+      mutate(assay_status = if_else(assay_status_category == "In released product", "in product", assay_status)) %>%
+      select(uniprot, assay_status_antigen_status, assay_status_category, assay_status, antigen_status_category, sorter) %>%
+      left_join(status_level_adjust %>% select(uniprot, sorter, vendor_a, vendor_b, artnr_a_arm, art_nr_b_arm, art_no_ag, antigen, vendor_ag, issue, comment_status), by = c("uniprot", "sorter")) %>%
+      mutate(antibody_pair_type = case_when(is.na(vendor_a) ~ "",
+                                            str_detect(vendor_a, "Agrisera| agrisera") & str_detect(vendor_b, "Agrisera| agrisera") ~ "Agrisera",
+                                            str_detect(vendor_a, "Agrisera| agrisera")  & !str_detect(vendor_b, "Agrisera| agrisera") ~ "Agrisera + commercial",
+                                            !str_detect(vendor_a, "Agrisera| agrisera")  & str_detect(vendor_b, "Agrisera| agrisera") ~ "Agrisera + commercial",
+                                            .default = "commercial")) %>%
+      mutate(polyclonal = case_when(is.na(vendor_a) ~ "",
+                                    artnr_a_arm == art_nr_b_arm ~ "yes",
+                                    .default = "")) %>%
+      relocate(c(antibody_pair_type, polyclonal), .after = antigen_status_category) %>%
+      select(-sorter)
     
     # export the data
     write_xlsx(status_final, paste0("output/", Sys.Date(), "_assay_status_per_uniprot.xlsx"))

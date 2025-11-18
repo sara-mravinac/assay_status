@@ -82,7 +82,7 @@ assay_status_resut_compare <-
               select(uniprot, "Status AEH")) %>%
   relocate(`Status AEH`, .after = uniprot)
 
-write_xlsx(assay_status_resut_compare, "assay_status_resut_compare_2025_11_14.xlsx")
+write_xlsx(assay_status_resut_compare, "assay_status_resut_compare_2025_11_17.xlsx")
 
 status_compare_count <-
   assay_status_resut_compare %>%
@@ -90,10 +90,5 @@ status_compare_count <-
   count() %>%
   arrange(desc(n))
 
-write_xlsx(status_compare_count, "status_compare_count_2025_11_14.xlsx")
-
-d72_status <- 
-  d72 %>%
-  select(uniprot, assay_status)
-
+write_xlsx(status_compare_count, "status_compare_count_2025_11_17.xlsx")
 
