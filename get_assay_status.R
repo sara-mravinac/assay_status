@@ -56,7 +56,6 @@ d72 <- read_xlsx("data/Master_list med 072 status.xlsx", sheet = "Dok_084-72") %
   select(uniprot, status, vendor_a, art_no_ag, artnr_a_arm, art_nr_b_arm, vendor_b, issue, antigen, vendor_ag, comment_status, sorter) %>%
   rename("assay_status" = status) %>%
   filter(!is.na(uniprot)) %>%
-  filter(!is.na(assay_status)) %>%
   mutate(across(where(is.character), str_squish))
 
 assay_status_resut <- get_assay_status(
@@ -67,16 +66,6 @@ assay_status_resut <- get_assay_status(
   d72,
   master_list
 )
-
-assay_status_resut %>%
-  select(assay_status_antigen_status) %>%
-  distinct() %>%
-  View()
-
-assay_status_resut %>%
-  group_by(uniprot) %>%
-  count() %>%
-  arrange(desc(n))
 
 angelica <- read_csv("data/Data driven Priolist with status update_To Kerhan_20250912(DA Priolist ).csv")
 
@@ -96,3 +85,4 @@ status_compare_count <-
 
 write_xlsx(status_compare_count, "status_compare_count_2025_11_17.xlsx")
 
+         

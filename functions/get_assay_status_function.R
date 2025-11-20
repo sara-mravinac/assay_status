@@ -253,11 +253,13 @@ get_assay_status <- function(uniprot_list,
                                             str_detect(vendor_a, "Agrisera| agrisera")  & !str_detect(vendor_b, "Agrisera| agrisera") ~ "Agrisera + commercial",
                                             !str_detect(vendor_a, "Agrisera| agrisera")  & str_detect(vendor_b, "Agrisera| agrisera") ~ "Agrisera + commercial",
                                             .default = "commercial")) %>%
+      mutate(artnr_a_arm_temp = str_remove(artnr_a_arm, "-CUSTOM.*|/CUSTOM.*|_CUSTOM.*"),
+             art_nr_b_arm_temp = str_remove(art_nr_b_arm, "-CUSTOM.*|/CUSTOM.*|_CUSTOM.*")) %>%
       mutate(polyclonal = case_when(is.na(vendor_a) ~ "",
-                                    artnr_a_arm == art_nr_b_arm & !(str_detect(vendor_a, "Hycult|Hytest|Medix|Abcam")) ~ "yes", # we only get monoclonal antibodies from these vendors, but they can be used on both arms
+                                    artnr_a_arm_temp == art_nr_b_arm_temp & !(str_detect(vendor_a, "Hycult|Hytest|Medix|Abcam")) ~ "yes", # we only get monoclonal antibodies from these vendors, but they can be used on both arms
                                     .default = "")) %>%
       relocate(c(antibody_pair_type, polyclonal), .after = antigen_status_category) %>%
-      select(-sorter)
+      select(-sorter, -artnr_a_arm_temp, -art_nr_b_arm_temp)
     
     # export the data
     write_xlsx(status_final, paste0("output/", Sys.Date(), "_assay_status_per_uniprot.xlsx"))
