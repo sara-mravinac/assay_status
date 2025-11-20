@@ -52,7 +52,8 @@ get_assay_status <- function(uniprot_list,
     # add information about assays in products, if status category disagree, in product overwrites any other status
     status_level_adjust <-
       uniprot_list %>%
-      left_join(d72) %>%
+      left_join(d72 %>%
+                  mutate(assay_status = if_else(is.na(assay_status), "Unclear", assay_status))) %>%
       mutate(assay_status = if_else(is.na(assay_status), "not screened", assay_status)) %>%
       mutate(assay_status = str_to_lower(assay_status)) %>%
       left_join(assay_categories) %>%
@@ -171,9 +172,9 @@ get_assay_status <- function(uniprot_list,
     screened_agrisera_1 <-
       screened_agrisera_prep %>%
       filter(!is.na(vendor_categry)) %>%
-      filter(vendor_a != vendor_antigen) %>%
       group_by(uniprot) %>%
       mutate(vendor_a_all = paste0(vendor_a, collapse = "; ")) %>%
+      filter(vendor_a != vendor_antigen) %>%
       ungroup() %>%
       relocate(vendor_a_all, .after = vendor_a) %>%
       filter(!str_detect(vendor_a_all, vendor_antigen)) %>% 
@@ -253,7 +254,7 @@ get_assay_status <- function(uniprot_list,
                                             !str_detect(vendor_a, "Agrisera| agrisera")  & str_detect(vendor_b, "Agrisera| agrisera") ~ "Agrisera + commercial",
                                             .default = "commercial")) %>%
       mutate(polyclonal = case_when(is.na(vendor_a) ~ "",
-                                    artnr_a_arm == art_nr_b_arm ~ "yes",
+                                    artnr_a_arm == art_nr_b_arm & !(str_detect(vendor_a, "Hycult|Hytest|Medix|Abcam")) ~ "yes", # we only get monoclonal antibodies from these vendors, but they can be used on both arms
                                     .default = "")) %>%
       relocate(c(antibody_pair_type, polyclonal), .after = antigen_status_category) %>%
       select(-sorter)

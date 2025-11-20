@@ -34,11 +34,15 @@ in_product <-
 
 # d72 <- read_xlsx("data/DOK084-072 Summary of results in PD084.xlsx", sheet = "All assays", skip = 2) %>%
 #   clean_names() %>%
-#   rename("assay_status" = status)
+#   rename("assay_status" = status) %>%
+#   filter(!is.na(uniprot)) %>%
+#   filter(!is.na(assay_status)) %>%
+#   mutate(across(where(is.character), str_squish))
 # 
 # master_list <- read_xlsx("data/Masterlist.xlsx") %>%
 #   clean_names() %>%
-#   rename("uniprot" = "uniprot_id")
+#   rename("uniprot" = "uniprot_id") %>%
+#   mutate(across(where(is.character), str_squish))
 
 source("functions/get_assay_status_function.R")
 
@@ -50,7 +54,7 @@ master_list <-
 d72 <- read_xlsx("data/Master_list med 072 status.xlsx", sheet = "Dok_084-72") %>%
   clean_names() %>%
   select(uniprot, status, vendor_a, art_no_ag, artnr_a_arm, art_nr_b_arm, vendor_b, issue, antigen, vendor_ag, comment_status, sorter) %>%
-  rename("assay_status" = status) %>% 
+  rename("assay_status" = status) %>%
   filter(!is.na(uniprot)) %>%
   filter(!is.na(assay_status)) %>%
   mutate(across(where(is.character), str_squish))
